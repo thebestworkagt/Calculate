@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="pt-pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Calculate - Calculadora Offline</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1e293b">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+        body {
+            background: linear-gradient(145deg, #0a0f1e 0%, #0c1222 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            padding: 20px;
+        }
+        .calculator-card {
+            max-width: 500px;
+            width: 100%;
+            background: rgba(18, 25, 45, 0.75);
+            backdrop-filter: blur(12px);
+            border-radius: 56px;
+            padding: 24px 20px 32px;
+            box-shadow: 0 25px 45px rgba(0,0,0,0.5);
+        }
+        .display {
+            background: #010314;
+            border-radius: 42px;
+            padding: 28px 24px;
+            margin-bottom: 28px;
+        }
+        .expression {
+            font-size: 1.4rem;
+            color: #8e9dbb;
+            text-align: right;
+            min-height: 2.2rem;
+        }
+        .result {
+            font-size: 3.6rem;
+            font-weight: 700;
+            color: #f0f3ff;
+            text-align: right;
+            word-break: break-word;
+        }
+        .buttons-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 14px;
+        }
+        .btn {
+            background: rgba(28, 38, 58, 0.8);
+            backdrop-filter: blur(8px);
+            border: none;
+            padding: 18px 0;
+            border-radius: 32px;
+            font-size: 1.7rem;
+            font-weight: 600;
+            color: #eef3ff;
+            box-shadow: 0 8px 14px rgba(0,0,0,0.3);
+            cursor: pointer;
+            transition: all 0.1s ease;
+        }
+        .btn:active { transform: translateY(3px); }
+        .btn-clear { background: #2a1e3c; color: #ffb8e7; }
+        .btn-equals { background: linear-gradient(135deg, #5f4bff, #3a2ac0); }
+        .btn-operator { background: #232e48; color: #b9e2ff; }
+        .btn-number { background: #0f172fe0; }
+        @media (max-width: 480px) {
+            .btn { padding: 14px 0; font-size: 1.4rem; }
+            .result { font-size: 2.6rem; }
+        }
+    </style>
+</head>
+<body>
+<div class="calculator-card">
+    <div style="margin-bottom: 8px;"><span style="background:rgba(95,75,255,0.3); padding:4px 14px; border-radius:40px;">🧮 CALCULATE</span></div>
+    <div class="display">
+        <div class="expression" id="expression">0</div>
+        <div class="result" id="result">0</div>
+    </div>
+    <div class="buttons-grid">
+        <button class="btn btn-clear" id="clearBtn">AC</button>
+        <button class="btn btn-clear" id="delBtn">⌫</button>
+        <button class="btn btn-operator" id="percentBtn">%</button>
+        <button class="btn btn-operator" id="divideBtn">÷</button>
+        <button class="btn btn-number" id="num7">7</button>
+        <button class="btn btn-number" id="num8">8</button>
+        <button class="btn btn-number" id="num9">9</button>
+        <button class="btn btn-operator" id="multiplyBtn">×</button>
+        <button class="btn btn-number" id="num4">4</button>
+        <button class="btn btn-number" id="num5">5</button>
+        <button class="btn btn-number" id="num6">6</button>
+        <button class="btn btn-operator" id="minusBtn">-</button>
+        <button class="btn btn-number" id="num1">1</button>
+        <button class="btn btn-number" id="num2">2</button>
+        <button class="btn btn-number" id="num3">3</button>
+        <button class="btn btn-operator" id="plusBtn">+</button>
+        <button class="btn btn-number" id="num0">0</button>
+        <button class="btn btn-number" id="dotBtn">.</button>
+        <button class="btn btn-equals" id="equalsBtn" style="grid-column: span 2;">=</button>
+    </div>
+    <div style="margin-top:20px; text-align:center; font-size:0.7rem; color:#6a7a9e;">📴 100% offline | Calculate</div>
+</div>
+<script>
+    let currentExpression = "";
+    let lastResult = null;
+    let waitingForOperand = false;
+    const expressionDiv = document.getElementById('expression');
+    const resultDiv = document.getElementById('result');
+
+    function updateDisplay() {
+        expressionDiv.innerText = currentExpression === "" ? "0" : currentExpression;
+        if (lastResult !== null && !waitingForOperand) {
+            resultDiv.innerText = formatNumber(lastResult);
+        } else if (currentExpression !== "") {
+            resultDiv.innerText = "⟳";
+        } else {
+            resultDiv.innerText = "0";
+        }
+    }
+
+    function formatNumber(num) {
+        if (isNaN(num) || !isFinite(num)) return "Erro";
+        return Number.isInteger(num) ? num.toString() : parseFloat(num.toFixed(8)).toString();
+    }
+
+    function calculateExpression(expr) {
+        let mathExpr = expr.replace(/÷/g, '/').replace(/×/g, '*');
+        mathExpr = mathExpr.replace(/\s/g, '');
+        if (mathExpr === "") return 0;
+        try {
+            if (!/^[\d.+\-*/%]+$/.test(mathExpr) && !/^-?[\d.+\-*/%]+$/.test(mathExpr)) throw new Error();
+            if (mathExpr.includes('%')) {
+                let temp = mathExpr.replace(/(\d+(?:\.\d+)?)%/g, (m,p1) => `(${parseFloat(p1)/100})`);
+                const fn = new Function('return (' + temp + ')');
+                return fn();
+            }
+            const fn = new Function('return (' + mathExpr + ')');
+            return fn();
+        } catch(e) { return NaN; }
+    }
+
+    function computeResult() {
+        if (currentExpression === "") {
+            if (lastResult !== null) currentExpression = lastResult.toString();
+            else return;
+        }
+        let result = calculateExpression(currentExpression);
+        if (isNaN(result)) { resultDiv.innerText = "Erro"; return; }
+        lastResult = result;
+        resultDiv.innerText = formatNumber(result);
+        currentExpression = formatNumber(result);
+        waitingForOperand = true;
+        updateDisplay();
+    }
+
+    function appendToExpression(value) {
+        if (waitingForOperand && !['+','-','×','÷','%'].includes(value)) {
+            currentExpression = "";
+            lastResult = null;
+            waitingForOperand = false;
+        }
+        if (currentExpression === "0" && !isNaN(value)) currentExpression = value;
+        else currentExpression += value;
+        waitingForOperand = false;
+        lastResult = null;
+        updateDisplay();
+    }
+
+    function clearAll() { currentExpression = ""; lastResult = null; waitingForOperand = false; updateDisplay(); resultDiv.innerText = "0"; expressionDiv.innerText = "0"; }
+    function deleteLast() { if (currentExpression.length > 0) currentExpression = currentExpression.slice(0,-1); updateDisplay(); }
+    function applyPercent() {
+        let val = calculateExpression(currentExpression);
+        if (!isNaN(val)) { let p = val/100; currentExpression = p.toString(); lastResult = p; waitingForOperand = true; updateDisplay(); }
+    }
+
+    document.getElementById('clearBtn').onclick = clearAll;
+    document.getElementById('delBtn').onclick = deleteLast;
+    document.getElementById('percentBtn').onclick = applyPercent;
+    document.getElementById('divideBtn').onclick = () => appendToExpression('÷');
+    document.getElementById('multiplyBtn').onclick = () => appendToExpression('×');
+    document.getElementById('minusBtn').onclick = () => appendToExpression('-');
+    document.getElementById('plusBtn').onclick = () => appendToExpression('+');
+    document.getElementById('equalsBtn').onclick = computeResult;
+    document.getElementById('dotBtn').onclick = () => appendToExpression('.');
+    for(let i=0;i<=9;i++) document.getElementById(`num${i}`).onclick = () => appendToExpression(i.toString());
+    updateDisplay();
+
+    // Service Worker registration
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').then(reg => console.log('SW registered:', reg)).catch(err => console.log('SW error:', err));
+    }
+</script>
+</body>
+</html>
